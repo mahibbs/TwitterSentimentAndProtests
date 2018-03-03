@@ -1,0 +1,50 @@
+require(foreign)
+require(dplyr)
+require(ggplot2)
+require(tidyr)
+require(stringr)
+require(readr)
+require(scales)
+require(tidytext)
+require(gtools)
+require(plyr)
+require(lubridate)
+require(tidyverse)
+
+#Creating an NRC_Arabic with neutral values and emotions as columns 
+
+Temp.NRC_Arabic$Positive <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "positive" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Negative <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "negative" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Sadness <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "sadness" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Surprise <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "surprise" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Trust <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "trust" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Anger <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "anger" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Anticipation <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "anticipation" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Disgust <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "disgust" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Fear <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "fear" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Joy <- ifelse(Temp.NRC_Arabic$'[Emotion]' == "joy" & Temp.NRC_Arabic$'[Emotion Indicator]' == 1, 1, 0)
+Temp.NRC_Arabic$Neutral <- ifelse((Temp.NRC_Arabic$Positive == 0) & (Temp.NRC_Arabic$Negative == 0) & (Temp.NRC_Arabic$'[Emotion]' %in% c("positive","negative")), 1, 0)
+
+Temp.NRC_Arabic <- filter(Temp.NRC_Arabic, !(Positive == 0 & Negative == 0 & Neutral == 0 & Joy == 0 & Trust == 0 & Fear == 0 & Surprise == 0 & Sadness == 0 & Disgust == 0 & Anticipation == 0 & Anger == 0))
+
+names(Temp.NRC_Arabic)[1:5] <- c("English.Term", "Emotion", "Emotion.Indicator", "Arabic.translation", "Buckwalter")
+
+#Create new Neutral variable
+temp.nrc.neutrality <- Temp.NRC_Arabic %>% 
+  group_by(Arabic.translation, English.Term) %>% 
+  filter(Emotion %in% c("positive", "negative")) %>% 
+  summarise(Neutrality=sum(Emotion.Indicator))
+temp.nrc.neutrality$Neutrality <- ifelse(temp.nrc.neutrality$Neutrality >= 1, 0,1)
+
+#Join with lexicon
+temp.nrc.join <- inner_join(Temp.NRC_Arabic, temp.nrc.neutrality, by = c("Arabic.translation", "English.Term"))
+temp.nrc.join$Neutral <- NULL
+temp.nrc.join <- filter(temp.nrc.join, !(Positive == 0 & Negative == 0 & Neutrality == 0 & Joy == 0 & Trust == 0 & Fear == 0 & Surprise == 0 & Sadness == 0 & Disgust == 0 & Anticipation == 0 & Anger == 0))
+temp.nrc.join <- filter(temp.nrc.join, !(Neutrality == 1 & Emotion == "positive"))
+
+temp.nrc.join <- filter(temp.nrc.join, !(Neutrality == 0 & Emotion == "negative"))
+
+#Removes all instances where neutrality == 1 and one of the other moods also == 1
+temp.nrc.join$Neutrality <- ifelse((temp.nrc.join$Positive | temp.nrc.join$Negative | temp.nrc.join$Sadness | temp.nrc.join$Surprise | temp.nrc.join$Trust | temp.nrc.join$Anger | temp.nrc.join$Anticipation | temp.nrc.join$Disgust | temp.nrc.join$Fear | temp.nrc.join$Joy == 1), 0, 1) 
+
+names(temp.nrc.join)[16] <- c("Neutral")
